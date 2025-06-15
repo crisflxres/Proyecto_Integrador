@@ -1,9 +1,3 @@
+.virtual/
 __pycache__/
 *.pyc
-*.env
-__pycache__/
-*.pyc
-.virtual/
-.virtual/
-.virtual/
-.virtual/
