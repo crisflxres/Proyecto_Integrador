@@ -1,6 +1,6 @@
 import serial, time
 #Importamos la libreria serial para poder comunicarnos con el Arduino
-arduino = serial.Serial('COM3', 9600)
+arduino = serial.Serial('COM5', 9600)
 time.sleep(2)  # Esperamos a que se establezca la conexión
 def enviar_comando(comando):
     arduino.write(comando.encode())  # Enviamos el comando al Arduino
