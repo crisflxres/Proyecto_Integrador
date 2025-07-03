@@ -10,27 +10,28 @@ time.sleep(2)
 # Lista para guardar datos
 datos = []
 
-try: #
-    while False:
-        if arduino.in_waiting() > 0:
+try: #Manejamos excepcionespara evitar errores
+    while True: #Bucle infinito para capturar los datos
+        if arduino.in_waiting > 0:
             linea = arduino.readline().decode('utf-8').strip()
             
             if "IZQ" in linea and "DER" in linea and "CENTRO" in linea:
+                print(linea)
 
                 posiciones = linea.split()
                 izquierda = int(posiciones[1])
                 centro = int(posiciones[3])
                 derecha = int(posiciones[5])
 
-                datos.append9({izquierda, centro, derecha})
+                datos.append({izquierda, centro, derecha})
 except KeyboardInterrupt:
     print(f"Datos capturados: {len(datos)}")
 
 df = pd.DataFrame(datos, columns=['Izquierda', 'Centro', 'Derecha'])
-df.to_csv('Lecturas de los Sensores.csv', index=False)
+df.to_csv('Lecturas_de_los_sensores.csv', index=False)
 
 sensores_array = np.array(datos)
 
-print(f"Array de los sensores: {sensores_array}")
+print(f"Array de los sensores: {sensores_array.shape}")
 
 arduino.close()
