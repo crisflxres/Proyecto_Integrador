@@ -9,7 +9,7 @@ from sklearn.pipeline import Pipeline #Crear un pipeline de procesamiento
 archivo_csv = 'Lecturas_de_los_sensores.csv'
 modelo_archivo = 'modelo_carrito.pkl' 
 
-if _name_ == "_main_":
+if __name__ == "__main__":
     print("- ENTRENAMIENTO DEL CARRITO -")
     try:
         df = pd.read_csv(archivo_csv)
