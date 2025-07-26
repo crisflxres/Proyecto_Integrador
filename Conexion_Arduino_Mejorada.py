@@ -15,7 +15,7 @@ def conexion_con_bluetooth():
     try: #Manejamos excepciones para evitar errores
         if arduino is None or not arduino.is_open:
             arduino = serial.Serial(puerto_bluetooth, velocidad_arduino)
-            time.sleep(3)
+            time.sleep(2)
     except serial.SerialException as e:
         print(f"Error conectando Bluetooth: {e}")
         exit()

@@ -68,7 +68,7 @@ def predecir_accion(izquierda, centro, derecha):
         
         # Validar que sea un comando válido
         comandos_validos = ['adelante', 'der', 'izq', 'der_fuerte', 
-                           'izq_fuerte', 'adelante_lento', 'reversa']
+                            'izq_fuerte', 'adelante_lento', 'reversa']
         
         if prediccion not in comandos_validos:
             return "reversa"
