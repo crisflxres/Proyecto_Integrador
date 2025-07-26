@@ -4,66 +4,60 @@ import joblib
 import pandas as pd
 
 # --- Configuración ---
-puerto_arduino = 'COM5'  # Cambiar si es necesario
+puerto_bluetooth = 'COM3'
 velocidad_arduino = 9600
-modelo_archivo = 'modelo_carrito.pkl'
+modelo_archivo = 'modelo_carrito.pkl' #Archivo del modelo entrenado
 
 # Variables globales
 arduino = None
 modelo = None
 
-def conectar_arduino():
+def conectar_bluetooth():
     global arduino
     try:
-        arduino = serial.Serial(puerto_arduino, velocidad_arduino, timeout=1)
-        time.sleep(2)
-        print("✓ Conectado con Arduino")
-        
-        # Esperar señal de que Arduino está listo
+        arduino = serial.Serial(puerto_bluetooth, velocidad_arduino, timeout=1)
+        time.sleep(3) 
+        print("Conectado con Arduino")
         while True:
             if arduino.in_waiting > 0:
                 linea = arduino.readline().decode('utf-8').strip()
-                if "ARDUINO_READY" in linea:
-                    print("✓ Arduino listo")
+                if "ARDUINO_LISTO" in linea:
+                    print("Arduino listo")
                     break
         return True
     except Exception as e:
-        print(f"❌ Error conectando Arduino: {e}")
+        print(f"Error conectando via Bluetooth: {e}")
         return False
 
 def cargar_modelo():
     global modelo
     try:
         modelo = joblib.load(modelo_archivo)
-        print("✓ Modelo ML cargado")
+        print("Modelo ML cargado")
         return True
     except FileNotFoundError:
-        print(f"❌ No se encontró '{modelo_archivo}'")
-        print("   Ejecuta primero 'entrenamiento_modelo.py'")
+        print(f"No se encontró '{modelo_archivo}'")
+        print("Ejecuta primero 'Entrenamiento_ML.py'")
         return False
     except Exception as e:
-        print(f"❌ Error cargando modelo: {e}")
+        print(f"Error cargando modelo: {e}")
         return False
 
-def parsear_sensores(linea):
-    """Extrae valores de sensores de la línea de Arduino"""
+def extraer_valores_sensores(linea):
     try:
-        if "IZQ" in linea and "CENTRO" in linea and "DER" in linea:
-            # Formato: "IZQ: 123 CENTRO: 456 DER: 789"
+        if "IZQ:" in linea and "CENTRO:" in linea and "DER:" in linea:
             partes = linea.replace(":", "").split()
             izquierda = int(partes[1])
             centro = int(partes[3])
             derecha = int(partes[5])
-            
-            # Verificar si está en reversa
+            #Verifica que esta en reversa
             en_reversa = "REVERSA" in linea
             return izquierda, centro, derecha, en_reversa
-    except:
+    except Exception:
         pass
     return None, None, None, False
 
 def predecir_accion(izquierda, centro, derecha):
-    """Usa el modelo ML para predecir la acción"""
     try:
         # Crear DataFrame igual que en entrenamiento
         X = pd.DataFrame([[izquierda, centro, derecha]], 
@@ -71,78 +65,97 @@ def predecir_accion(izquierda, centro, derecha):
         
         # Hacer predicción
         prediccion = modelo.predict(X)[0]
+        
+        # Validar que sea un comando válido
+        comandos_validos = ['adelante', 'der', 'izq', 'der_fuerte', 
+                           'izq_fuerte', 'adelante_lento', 'reversa']
+        
+        if prediccion not in comandos_validos:
+            return "reversa"
+        
         return prediccion
     except Exception as e:
-        print(f"Error en predicción: {e}")
-        return "parar"
+        print(f"Error en predicción ML: {e}")
+        return "reversa"
 
 def enviar_comando(comando):
-    """Envía comando al Arduino"""
     try:
         arduino.write((comando + '\n').encode())
+        arduino.flush()  # Asegurar envío inmediato
         return True
     except Exception as e:
         print(f"Error enviando comando: {e}")
         return False
 
 def main():
-    print("=== ROBOT CON MACHINE LEARNING ===")
+    print("- ROBOT CON IA -")
+    print("Comunicación 100% Bluetooth")
     
-    # Cargar modelo
+    # Cargar modelo ML
     if not cargar_modelo():
         return
     
-    # Conectar Arduino
-    if not conectar_arduino():
+    # Conectar via Bluetooth
+    if not conectar_bluetooth():
         return
     
-    print("\n🤖 Robot funcionando con IA")
-    print("📊 Presiona Ctrl+C para detener\n")
+    print("\n Robot funcionando con IA")
+    print("Presiona Ctrl+C para detener")
     
-    contador = 0
+    contador_lecturas = 0
+    contador_predicciones = 0
     
     try:
         while True:
             if arduino.in_waiting > 0:
                 linea = arduino.readline().decode('utf-8').strip()
                 
-                # Parsear datos de sensores
-                izquierda, centro, derecha, en_reversa = parsear_sensores(linea)
-                
-                if izquierda is not None:
-                    if not en_reversa:
-                        # Modo normal: ¡AQUÍ ES LA MAGIA! ML predice la acción
-                        accion_ml = predecir_accion(izquierda, centro, derecha)
+                if linea:  # Si hay contenido en la línea
+                    izquierda, centro, derecha, en_reversa = extraer_valores_sensores(linea)
+                    
+                    if izquierda is not None:  # Datos de sensores válidos
+                        contador_lecturas += 1
                         
-                        # Enviar comando al Arduino
-                        enviar_comando(accion_ml)
-                        
-                        # Mostrar información cada 10 lecturas
-                        contador += 1
-                        if contador % 10 == 0:
-                            print(f"Sensores: IZQ={izquierda:3d} CEN={centro:3d} DER={derecha:3d} → Acción ML: {accion_ml}")
+                        if not en_reversa:
+                            accion_ml = predecir_accion(izquierda, centro, derecha)
+                            contador_predicciones += 1
+                            
+                            if enviar_comando(accion_ml):
+                                if contador_lecturas % 8 == 0:
+                                    print(f"#{contador_predicciones:03d} | IZQ={izquierda:3d} CEN={centro:3d} DER={derecha:3d} → {accion_ml.upper()}")
+                            else:
+                                print("Error enviando comando al Arduino")
+                        else:
+                            if contador_lecturas % 15 == 0:
+                                print(f"⬅ REVERSA... | IZQ={izquierda:3d} CEN={centro:3d} DER={derecha:3d}")
+                    
                     else:
-                        # Modo reversa: Arduino controla automáticamente
-                        if contador % 15 == 0:  # Mostrar menos frecuentemente
-                            print(f"⬅️ REVERSA... Sensores: IZQ={izquierda:3d} CEN={centro:3d} DER={derecha:3d}")
-                
-                # Mostrar mensajes especiales
-                elif "INICIANDO_REVERSA" in linea:
-                    print("⬅️ Robot perdió la línea - Yendo en reversa")
-                elif "LINEA_ENCONTRADA" in linea:
-                    print("✅ ¡Línea encontrada! Volviendo al control ML")
-            
-            time.sleep(0.01)  # Pequeña pausa
+                        if "INICIANDO_REVERSA" in linea:
+                            print("\n⬅ Robot perdió la línea - Maniobra de reversa automática")
+                        elif "LINEA_ENCONTRADA" in linea:
+                            print("¡Línea recuperada! Volviendo al control ML\n")
+                        elif "ARDUINO_LISTO" in linea:
+                            print("Arduino confirmó conexión")
+                        elif "Robot ML listo" in linea:
+                            print("Arduino en modo ML")
+                            if contador_lecturas % 20 == 0:  # Mostrar ocasionalmente
+                                print(f"Arduino: {linea}")
+            time.sleep(0.01)  # Pausa mínima
             
     except KeyboardInterrupt:
-        print("\n\n🛑 Deteniendo robot...")
-        enviar_comando("parar")
-        time.sleep(0.5)
+        print(f"\nDeteniendo robot...")
+        print(f"Estadísticas de la sesión:")
+        print(f"   - Lecturas de sensores: {contador_lecturas}")
+        print(f"   - Predicciones ML ejecutadas: {contador_predicciones}")
+        print(f"   - Precisión: {(contador_predicciones/max(contador_lecturas, 1)*100):.1f}%")
+        
+        enviar_comando("reversa")
+        time.sleep(1)
         
     finally:
         if arduino and arduino.is_open:
             arduino.close()
-        print("✓ Desconectado")
+        print("Desconectado del Bluetooth")
 
 if __name__ == "__main__":
     main()
